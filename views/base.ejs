@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title><%= typeof title !== 'undefined' ? title : app_name %></title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800">
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <a href="/" class="flex items-center space-x-3">
+          <div class="w-8 h-8 rounded-md bg-gradient-to-br from-blue-500 to-purple-600"></div>
+          <div>
+            <h1 class="text-base sm:text-lg font-semibold text-gray-900"><%= app_name %></h1>
+            <p class="text-[11px] text-gray-500">Anime Downloader</p>
+          </div>
+        </a>
+
+        <nav class="hidden md:flex items-center gap-1">
+          <a href="/" class="nav-link px-3 py-2 text-sm rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100">Dashboard</a>
+          <a href="/downloads" class="nav-link px-3 py-2 text-sm rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100">Downloads</a>
+          <a href="/settings" class="nav-link px-3 py-2 text-sm rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100">Settings</a>
+        </nav>
+
+        <button class="md:hidden px-3 py-2 rounded border border-gray-300 text-sm" onclick="toggleMobileMenu()">
+          Menu
+        </button>
+      </div>
+    </div>
+
+    <div id="mobileMenu" class="md:hidden hidden border-t border-gray-200 bg-white">
+      <div class="px-4 py-2">
+        <a href="/" class="block px-3 py-2 text-sm rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100">Dashboard</a>
+        <a href="/downloads" class="block px-3 py-2 text-sm rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100">Downloads</a>
+        <a href="/settings" class="block px-3 py-2 text-sm rounded-md text-gray-700 hover:text-blue-600 hover:bg-gray-100">Settings</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <%- body %>
+    </div>
+  </main>
+
+  <script>
+    function toggleMobileMenu() {
+      document.getElementById('mobileMenu').classList.toggle('hidden');
+    }
+
+    // Active nav
+    document.querySelectorAll('.nav-link').forEach(link => {
+      if (link.getAttribute('href') === window.location.pathname) {
+        link.classList.add('text-blue-600', 'bg-gray-100');
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<%
+const content = `
+<div class="space-y-6">
+  <!-- Download Status -->
+  <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Download Status</h2>
+      <div id="downloadStatus" class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-700">
+        Idle
+      </div>
+    </div>
+    <div id="statusContent" class="text-sm text-gray-600">
+      No downloads currently running.
+    </div>
+  </div>
+
+  <!-- Queue -->
+  <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Download Queue</h2>
+      <div class="space-x-2">
+        <button onclick="loadQueueDetails()" class="px-3 py-2 text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50">
+          <i class="fas fa-sync-alt mr-2"></i>Refresh
+        </button>
+        <button onclick="clearQueue()" class="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-700">
+          <i class="fas fa-trash mr-2"></i>Clear Queue
+        </button>
+      </div>
+    </div>
+    <div id="queueContent">
+      <p class="text-gray-600">Loading queue...</p>
+    </div>
+  </div>
+
+  <!-- Live Output -->
+  <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between p-4 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Live Download Output</h2>
+      <div class="space-x-2">
+        <button onclick="clearLogs()" class="px-3 py-2 text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50">
+          <i class="fas fa-trash mr-2"></i>Clear
+        </button>
+        <button id="pauseBtn" onclick="togglePause()" class="px-3 py-2 text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50">
+          <i class="fas fa-pause mr-2"></i>Pause
+        </button>
+      </div>
+    </div>
+    <div id="logContainer" class="h-96 overflow-y-auto bg-gray-900 text-green-400 font-mono text-sm p-4">
+      <div class="text-gray-500">Waiting for download output...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let eventSource = null;
+  let logsPaused = false;
+  let outputCount = 0;
+
+  function initializeStream() {
+    if (eventSource) eventSource.close();
+    eventSource = new EventSource('/api/download/stream');
+
+    eventSource.onmessage = function(event) {
+      if (logsPaused) return;
+      
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'log') {
+          addLog(data.data);
+        } else if (data.type === 'status') {
+          updateStatus(data.data);
+        } else if (data.type === 'downloadStart') {
+          addLog({ message: 'Starting: ' + data.data.url, level: 'info' });
+        } else if (data.type === 'downloadComplete') {
+          addLog({ message: 'Completed: ' + data.data.url, level: 'success' });
+        }
+      } catch (error) {
+        console.error('Parse error:', error);
+      }
+    };
+  }
+
+  function addLog(entry) {
+    const container = document.getElementById('logContainer');
+    if (outputCount === 0) container.innerHTML = '';
+
+    const line = document.createElement('div');
+    line.className = 'mb-1';
+    
+    const levelClass = entry.level === 'error' ? 'text-red-400' : 
+                      entry.level === 'success' ? 'text-green-400' :
+                      entry.level === 'warning' ? 'text-yellow-400' : 'text-gray-300';
+    
+    const time = new Date(entry.timestamp).toLocaleTimeString();
+    line.innerHTML = '<span class="text-gray-500">[' + time + ']</span> <span class="' + levelClass + '">' + escapeHtml(entry.message) + '</span>';
+    
+    container.appendChild(line);
+    outputCount++;
+
+    while (container.children.length > 150) {
+      container.removeChild(container.firstChild);
+    }
+
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function updateStatus(data) {
+    const statusEl = document.getElementById('downloadStatus');
+    const contentEl = document.getElementById('statusContent');
+
+    if (data.isProcessing) {
+      statusEl.className = 'px-3 py-1 text-sm rounded-full bg-blue-100 text-blue-700';
+      statusEl.textContent = 'Downloading';
+      contentEl.innerHTML = '<div class="flex items-center space-x-2"><div class="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div><span>Active download - ' + data.queueLength + ' in queue</span></div>';
+    } else {
+      statusEl.className = 'px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-700';
+      statusEl.textContent = 'Idle';
+      contentEl.textContent = 'No downloads currently running.';
+    }
+  }
+
+  async function loadQueueDetails() {
+    try {
+      const res = await fetch('/api/download/queue');
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error);
+
+      const data = result.data;
+      const container = document.getElementById('queueContent');
+
+      if (data.queueLength === 0 && !data.isProcessing) {
+        container.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-inbox text-4xl mb-3"></i><p>No downloads in queue</p></div>';
+        return;
+      }
+
+      let html = '';
+      if (data.isProcessing) {
+        html += '<div class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg"><div class="flex items-center space-x-3"><div class="animate-spin h-6 w-6 border-2 border-blue-600 border-t-transparent rounded-full"></div><div><div class="font-medium text-blue-900">Currently Downloading</div><div class="text-sm text-blue-700 mt-1">' + data.queueLength + ' items remaining</div></div></div></div>';
+      }
+
+      if (data.queue && data.queue.length > 0) {
+        html += '<div class="space-y-2">';
+        data.queue.forEach(function(item, index) {
+          html += '<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg"><div class="flex items-start space-x-3"><div class="flex-shrink-0 mt-1"><div class="h-6 w-6 bg-gray-300 rounded-full flex items-center justify-center text-xs font-bold text-gray-600">' + (index + 1) + '</div></div><div class="flex-1 min-w-0"><div class="text-sm text-gray-900 break-all">' + escapeHtml(item.url) + '</div></div></div></div>';
+        });
+        html += '</div>';
+      }
+
+      container.innerHTML = html;
+    } catch (error) {
+      document.getElementById('queueContent').innerHTML = '<div class="text-red-600">Error: ' + error.message + '</div>';
+    }
+  }
+
+  async function clearQueue() {
+    if (!confirm('Clear entire queue?')) return;
+    try {
+      await fetch('/api/download/queue', { method: 'DELETE' });
+      loadQueueDetails();
+    } catch (error) {
+      alert('Error: ' + error.message);
+    }
+  }
+
+  function clearLogs() {
+    document.getElementById('logContainer').innerHTML = '<div class="text-gray-500">Logs cleared. Waiting for new output...</div>';
+    outputCount = 0;
+  }
+
+  function togglePause() {
+    logsPaused = !logsPaused;
+    const btn = document.getElementById('pauseBtn');
+    if (logsPaused) {
+      btn.innerHTML = '<i class="fas fa-play mr-2"></i>Resume';
+      btn.className = 'px-3 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700';
+    } else {
+      btn.innerHTML = '<i class="fas fa-pause mr-2"></i>Pause';
+      btn.className = 'px-3 py-2 text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50';
+    }
+  }
+
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  initializeStream();
+  loadQueueDetails();
+  setInterval(loadQueueDetails, 3000);
+</script>
+`;
+%>
+<%- include('base', { body: content }) %>

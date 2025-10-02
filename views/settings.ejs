@@ -1,0 +1,179 @@
+<%
+const content = `
+<div class="space-y-8">
+  <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Jellyfin Configuration</h2>
+      <div class="space-x-2">
+        <button onclick="testJellyfin()" class="px-3 py-2 text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50">
+          <i class="fas fa-plug mr-2"></i>Test Connection
+        </button>
+        <button onclick="saveJellyfin()" class="px-3 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700">
+          <i class="fas fa-save mr-2"></i>Save
+        </button>
+      </div>
+    </div>
+    <div id="jellyfinAlert" class="hidden mb-4 px-4 py-3 rounded-md border text-sm"></div>
+    <form id="jellyfinForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Server URL</label>
+        <input type="text" id="jf_serverUrl" placeholder="http://localhost:8096" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+        <input type="password" id="jf_apiKey" placeholder="Your Jellyfin API Key" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">User ID (Optional)</label>
+        <input type="text" id="jf_userId" placeholder="User ID" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Library ID (Optional)</label>
+        <input type="text" id="jf_libraryId" placeholder="Library ID" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+      </div>
+    </form>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">SSH Upload Configuration</h2>
+      <div class="space-x-2">
+        <button onclick="saveSSH()" class="px-3 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700">
+          <i class="fas fa-save mr-2"></i>Save
+        </button>
+      </div>
+    </div>
+    <div id="sshAlert" class="hidden mb-4 px-4 py-3 rounded-md border text-sm"></div>
+    <form id="sshForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="col-span-2">
+        <label class="flex items-center space-x-2">
+          <input type="checkbox" id="ssh_enabled" class="h-4 w-4 text-blue-600 border-gray-300 rounded" />
+          <span class="text-sm font-medium text-gray-700">Enable SSH Upload</span>
+        </label>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Host</label>
+        <input type="text" id="ssh_host" placeholder="192.168.1.100" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Port</label>
+        <input type="number" id="ssh_port" placeholder="22" value="22" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+        <input type="text" id="ssh_username" placeholder="mediaserver" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div class="col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Remote Path</label>
+        <input type="text" id="ssh_remotePath" placeholder="/mnt/media/anime" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+      </div>
+    </form>
+  </div>
+
+  <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">App Configuration</h2>
+      <button onclick="saveApp()" class="px-3 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700">
+        <i class="fas fa-save mr-2"></i>Save
+      </button>
+    </div>
+    <div id="appAlert" class="hidden mb-4 px-4 py-3 rounded-md border text-sm"></div>
+    <form id="appForm" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="col-span-2">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Download Path</label>
+        <input type="text" id="app_downloadPath" placeholder="./downloads" class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <div class="col-span-2">
+        <label class="flex items-center space-x-2">
+          <input type="checkbox" id="app_autoUpload" class="h-4 w-4 text-blue-600 border-gray-300 rounded" />
+          <span class="text-sm font-medium text-gray-700">Auto-upload after download</span>
+        </label>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function showAlert(section, message, isError) {
+    const alert = document.getElementById(section + 'Alert');
+    alert.className = 'mb-4 px-4 py-3 rounded-md border text-sm ' + (isError ? 'bg-red-50 text-red-800 border-red-200' : 'bg-green-50 text-green-800 border-green-200');
+    alert.textContent = message;
+    alert.classList.remove('hidden');
+    setTimeout(function() { alert.classList.add('hidden'); }, 3000);
+  }
+
+  async function testJellyfin() {
+    try {
+      const res = await fetch('/api/jellyfin/test');
+      const result = await res.json();
+      showAlert('jellyfin', result.connected ? 'Connection successful!' : 'Connection failed', !result.connected);
+    } catch (error) {
+      showAlert('jellyfin', 'Error: ' + error.message, true);
+    }
+  }
+
+  async function saveJellyfin() {
+    const config = {
+      serverUrl: document.getElementById('jf_serverUrl').value,
+      apiKey: document.getElementById('jf_apiKey').value,
+      userId: document.getElementById('jf_userId').value,
+      libraryId: document.getElementById('jf_libraryId').value
+    };
+
+    try {
+      const res = await fetch('/api/config/jellyfin', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      const result = await res.json();
+      showAlert('jellyfin', result.success ? 'Saved successfully' : 'Save failed', !result.success);
+    } catch (error) {
+      showAlert('jellyfin', 'Error: ' + error.message, true);
+    }
+  }
+
+  async function saveSSH() {
+    const config = {
+      enabled: document.getElementById('ssh_enabled').checked,
+      host: document.getElementById('ssh_host').value,
+      port: parseInt(document.getElementById('ssh_port').value),
+      username: document.getElementById('ssh_username').value,
+      remotePath: document.getElementById('ssh_remotePath').value
+    };
+
+    try {
+      const res = await fetch('/api/config/ssh', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      const result = await res.json();
+      showAlert('ssh', result.success ? 'Saved successfully' : 'Save failed', !result.success);
+    } catch (error) {
+      showAlert('ssh', 'Error: ' + error.message, true);
+    }
+  }
+
+  async function saveApp() {
+    const config = {
+      downloadPath: document.getElementById('app_downloadPath').value,
+      autoUpload: document.getElementById('app_autoUpload').checked
+    };
+
+    try {
+      const res = await fetch('/api/config/app', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+      const result = await res.json();
+      showAlert('app', result.success ? 'Saved successfully' : 'Save failed', !result.success);
+    } catch (error) {
+      showAlert('app', 'Error: ' + error.message, true);
+    }
+  }
+</script>
+`;
+%>
+<%- include('base', { body: content }) %>

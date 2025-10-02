@@ -1,0 +1,211 @@
+<%
+const content = `
+<div class="space-y-8">
+  <!-- Quick Actions -->
+  <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Quick Download</h2>
+      <a href="/downloads" class="px-3 py-2 text-sm rounded-md bg-gray-100 hover:bg-gray-200 text-gray-800">
+        View Queue
+      </a>
+    </div>
+
+    <form id="downloadForm" class="space-y-4">
+      <div>
+        <label for="url" class="block text-sm font-medium text-gray-700 mb-1">Aniworld URL</label>
+        <input id="url" name="url" type="text" placeholder="https://aniworld.to/anime/stream/..."
+          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div>
+          <label for="provider" class="block text-sm font-medium text-gray-700 mb-1">Provider</label>
+          <select id="provider" name="provider"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="voe">VOE</option>
+          </select>
+        </div>
+        <div>
+          <label for="language" class="block text-sm font-medium text-gray-700 mb-1">Language</label>
+          <select id="language" name="language"
+            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+            <option value="German Dub">German Dub</option>
+            <option value="German Sub">German Sub</option>
+            <option value="English Sub">English Sub</option>
+          </select>
+        </div>
+        <div class="flex items-end">
+          <button type="submit" id="downloadBtn"
+            class="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+            Start Download
+          </button>
+        </div>
+      </div>
+      <div id="downloadStatus" class="hidden text-sm px-3 py-2 rounded-md"></div>
+    </form>
+  </div>
+
+  <!-- Download Queue -->
+  <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Download Queue</h2>
+      <a href="/downloads" class="px-3 py-2 text-sm rounded-md bg-blue-100 hover:bg-blue-200 text-blue-800">
+        Details
+      </a>
+    </div>
+    <div id="queueSummary" class="space-y-3">
+      <div class="text-sm text-gray-500">Loading queue status...</div>
+    </div>
+  </div>
+
+  <!-- Jellyfin Overview -->
+  <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold text-gray-900">Jellyfin Library</h2>
+      <button id="reloadJellyfin" class="px-3 py-2 text-sm rounded-md border border-gray-300 bg-white hover:bg-gray-50">
+        <i class="fas fa-sync-alt mr-2"></i>Reload
+      </button>
+    </div>
+
+    <div id="jellyfinError" class="hidden px-4 py-3 rounded-md border bg-red-50 text-red-800 border-red-200 text-sm mb-4"></div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="p-6 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-lg">
+        <h5 class="text-sm font-medium text-blue-900 mb-1">Total Series</h5>
+        <p id="seriesCount" class="text-2xl font-bold text-blue-600">-</p>
+      </div>
+      <div class="p-6 bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg">
+        <h5 class="text-sm font-medium text-purple-900 mb-1">Total Episodes</h5>
+        <p id="episodeCount" class="text-2xl font-bold text-purple-600">-</p>
+      </div>
+      <div class="p-6 bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-lg">
+        <h5 class="text-sm font-medium text-green-900 mb-1">Recently Added</h5>
+        <p id="recentlyAdded" class="text-sm font-semibold text-green-700 truncate">-</p>
+      </div>
+    </div>
+
+    <div class="max-h-80 overflow-y-auto border border-gray-300 rounded-lg">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-600 bg-gray-50 sticky top-0">
+            <th class="py-3 px-4">Name</th>
+            <th class="py-3 px-4">Episodes</th>
+            <th class="py-3 px-4">ID</th>
+          </tr>
+        </thead>
+        <tbody id="jellyfinTableBody" class="text-gray-800">
+          <tr><td colspan="3" class="p-4 text-center text-gray-500">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showStatus(message, isError) {
+    const status = document.getElementById('downloadStatus');
+    status.textContent = message;
+    status.className = 'text-sm px-3 py-2 rounded-md ' + (isError 
+      ? 'bg-red-50 text-red-800 border border-red-200' 
+      : 'bg-blue-50 text-blue-800 border border-blue-200');
+    status.classList.remove('hidden');
+  }
+
+  document.getElementById('downloadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const url = document.getElementById('url').value.trim();
+    const provider = document.getElementById('provider').value;
+    const language = document.getElementById('language').value
+    const btn = document.getElementById('downloadBtn');
+
+    if (!url) {
+      showStatus('Please enter a URL', true);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Starting...';
+    showStatus('Adding to queue...', false);
+
+    try {
+      const res = await fetch('/api/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: url, provider: provider, language: language })
+      });
+
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error);
+
+      showStatus('Added to queue! Redirecting...', false);
+      setTimeout(function() { window.location.href = '/downloads'; }, 1500);
+    } catch (error) {
+      showStatus('Error: ' + error.message, true);
+      btn.disabled = false;
+      btn.textContent = 'Start Download';
+    }
+  });
+
+  async function loadQueueStatus() {
+    try {
+      const res = await fetch('/api/download/queue');
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error);
+
+      const data = result.data;
+      const container = document.getElementById('queueSummary');
+
+      if (data.isProcessing) {
+        container.innerHTML = '<div class="flex items-center space-x-3 p-3 bg-blue-50 rounded-lg border border-blue-200"><div class="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div><div class="flex-1"><div class="font-medium text-blue-900">Active Download</div><div class="text-xs text-blue-700">' + data.queueLength + ' remaining</div></div></div>';
+      } else if (data.queueLength > 0) {
+        container.innerHTML = '<div class="p-3 bg-yellow-50 rounded-lg border border-yellow-200"><div class="font-medium text-yellow-900">' + data.queueLength + ' in queue</div></div>';
+      } else {
+        container.innerHTML = '<div class="text-sm text-gray-500 flex items-center space-x-2"><i class="fas fa-check-circle text-green-500"></i><span>No downloads in queue</span></div>';
+      }
+    } catch (error) {
+      console.error('Queue status error:', error);
+    }
+  }
+
+  async function loadJellyfin() {
+    try {
+      const res = await fetch('/api/jellyfin/items');
+      const result = await res.json();
+      if (!result.success) throw new Error(result.error);
+
+      const items = result.data;
+      document.getElementById('seriesCount').textContent = items.length;
+      
+      const tbody = document.getElementById('jellyfinTableBody');
+      tbody.innerHTML = '';
+
+      let recentItem = null;
+      items.forEach(function(item) {
+        if (item.Type === 'Series') {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-gray-50 transition-colors';
+          tr.innerHTML = '<td class="p-4 font-medium">' + item.Name + '</td><td class="p-4">-</td><td class="p-4"><code class="text-xs bg-gray-100 px-2 py-1 rounded">' + item.Id + '</code></td>';
+          tbody.appendChild(tr);
+
+          if (!recentItem || new Date(item.DateCreated) > new Date(recentItem.DateCreated)) {
+            recentItem = item;
+          }
+        }
+      });
+
+      document.getElementById('recentlyAdded').textContent = recentItem ? recentItem.Name : '-';
+    } catch (error) {
+      document.getElementById('jellyfinError').textContent = 'Failed to load Jellyfin data';
+      document.getElementById('jellyfinError').classList.remove('hidden');
+      console.log(error)
+    }
+  }
+
+  document.getElementById('reloadJellyfin').addEventListener('click', loadJellyfin);
+
+  setInterval(loadQueueStatus, 3000);
+  loadQueueStatus();
+  loadJellyfin();
+</script>
+`;
+%>
+<%- include('base', { body: content }) %>
