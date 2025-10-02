@@ -1,4 +1,3 @@
-import { Client } from 'ssh2';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigModule } from './ConfigModule';
@@ -28,10 +27,6 @@ function execCmd(
 
 function toPosix(p: string) { return p.replace(/\\/g, '/'); }
 
-async function ensureRemoteDir(u: string, h: string, p: number, dir: string, log: any) {
-  await execCmd("ssh", ["-p", String(p), `${u}@${h}`, `mkdir -p "${dir}"`], log, log);
-}
-
 export class SSHUploadModule {
   private config: ReturnType<ConfigModule['getSSHConfig']>;
 
@@ -46,7 +41,7 @@ export class SSHUploadModule {
   /**
    * Upload file to remote server via SSH
    */
-  async uploadFile(localPath: string, remotePath?: string): Promise<void> {
+  async uploadFile(localPath: string, remotePath?: string, enabledDeletionAfterwards: boolean = true): Promise<void> {
     if (!this.config.enabled) throw new Error('SSH upload is disabled');
 
     // POSIX-Pfad bauen
@@ -67,6 +62,10 @@ export class SSHUploadModule {
       "scp",
       ["-P", String(this.config.port), localPath, `${this.config.username}@${this.config.host}:${targetPath}`]
     );
+
+    if(enabledDeletionAfterwards){
+      this.delete_local_dir(localPath)
+    }
   }
 
 
@@ -85,8 +84,16 @@ export class SSHUploadModule {
         const localFilePath = path.join(file.path, file.name);
         const relPath = path.relative(localDir, localFilePath).split(path.sep).join("/");
         const remoteFilePath = path.posix.join(targetDir, relPath);
-        await this.uploadFile(localFilePath, remoteFilePath);
+        await this.uploadFile(localFilePath, remoteFilePath, false);
       }
+    }
+
+    await this.delete_local_dir(localDir)
+  }
+
+  async delete_local_dir(localDir: string) {
+    if (fs.existsSync(localDir)) {
+      await fs.promises.rm(localDir, { recursive: true, force: true });
     }
   }
 }
